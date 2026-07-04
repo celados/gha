@@ -41,11 +41,38 @@ To mint a new/replacement key: `ssh -p 2222 root@204.168.246.193 'cd /opt/prism
 && docker compose exec prism prism account key create --label <consumer>'`,
 then `gh secret set PRISM_API_KEY --org celados --visibility all`.
 
+### GitHub Free: org secrets/variables don't reach private repos
+
+`celados` is on GitHub Free. Per GitHub's docs (one easy-to-miss line):
+**organization-level secrets and variables are not accessible by private
+repositories on GitHub Free** — the plan, not a config mistake. GitHub doesn't
+error on this; the value just silently resolves to an empty string at
+runtime, even though `gh secret list --org` and the
+`repos/<owner>/<repo>/actions/organization-secrets` API both claim the repo
+has access. Confirmed empirically (`easel`, private) with a throwaway
+`workflow_dispatch` probe that echoed `${{ secrets.PRISM_API_KEY }}`'s length.
+
+Public repos (`devjar`, `mcpx`, `gha` itself) are unaffected and need no
+per-repo setup. **Private repos need their own repo-level copies** of all
+three (secret + 2 variables) — the org-level config is dead weight for them:
+
+```bash
+gh secret set PRISM_API_KEY -R celados/<repo> --body "<key>"
+gh variable set PRISM_ANTHROPIC_BASE_URL -R celados/<repo> --body "https://ai.celados.com/api/anthropic"
+gh variable set PRISM_OPENAI_RESPONSES_ENDPOINT -R celados/<repo> --body "https://ai.celados.com/api/openai/responses"
+```
+
+The real fix is upgrading `celados` to GitHub Team, which makes the org-level
+config actually work for private repos and removes this whole section — ask
+before doing that, it's a recurring paid decision, not something to script
+silently.
+
 ## Per-repo setup
 
 1. Copy `templates/agents.yml` to `<project>/.github/workflows/agents.yml`.
-2. Nothing else — the org already has the secret/variables above. Repos
-   outside `celados` would need their own copies of all three.
+2. If the repo is **public**: nothing else, the org-level config already
+   covers it. If it's **private**: run the three `gh secret set`/`gh variable
+   set` commands above first (see the GitHub Free caveat).
 3. Push. Mention `@claude` or `@codex` in an issue or PR comment to trigger.
 
 ## Why reusable workflows instead of copy-paste
