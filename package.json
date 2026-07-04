@@ -1,0 +1,7 @@
+{
+  "name": "gha",
+  "private": true,
+  "scripts": {
+    "provision": "bun scripts/provision.ts"
+  }
+}

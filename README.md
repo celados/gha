@@ -23,6 +23,8 @@ caller picks it up on its next trigger.
   executed.
 - `templates/agents.yml` — the thin caller file a downstream project copies
   into its own `.github/workflows/agents.yml`. It should never need to change.
+- `scripts/provision.ts` — onboards a new project (see below). Reads secrets
+  from local `.env` (gitignored, not in this listing on purpose).
 
 ## Private model routing
 
@@ -77,34 +79,24 @@ silently.
 
 ## Onboarding a new project
 
-This section is written for an agent to execute directly — if you're a fresh
-Claude Code session being pointed at this repo to integrate some other
-project, follow these steps in order.
+```bash
+bun run provision <repo>            # e.g. bun run provision easel
+bun run provision <repo> --verify   # also posts a test issue and waits for a green run
+bun run provision <repo> --path /some/other/checkout
+```
 
-1. `gh api repos/celados/<repo> --jq .visibility` to check visibility.
-2. Copy `templates/agents.yml` to `<repo>/.github/workflows/agents.yml`,
-   commit, push (mind any in-progress uncommitted work already in that repo —
-   stage only this one file, don't `git add -A`).
-3. **If public**: done. The org-level `PRISM_*` config already applies —
-   verify with step 4 and stop.
-4. **If private** (see the GitHub Free section above for why this is
-   necessary): read this repo's local `.env` (gitignored, never committed —
-   it holds the plaintext `PRISM_API_KEY`) and run:
-   ```bash
-   source .env  # or read PRISM_API_KEY from it however's convenient
-   gh secret set PRISM_API_KEY -R celados/<repo> --body "$PRISM_API_KEY"
-   gh variable set PRISM_ANTHROPIC_BASE_URL -R celados/<repo> --body "https://ai.celados.com/api/anthropic"
-   gh variable set PRISM_OPENAI_RESPONSES_ENDPOINT -R celados/<repo> --body "https://ai.celados.com/api/openai/responses"
-   ```
-   If `.env` isn't present (fresh checkout, sandboxed session with no access
-   to this machine's copy) ask the human operator to paste the current
-   `PRISM_API_KEY` value — never fabricate or reuse a placeholder, a wrong
-   key fails closed (401), not silently.
-5. Verify: open an issue (or comment on one) with `@claude hi`, then
-   `gh run list -R celados/<repo> --limit 3` and `gh run view <id> -R
-   celados/<repo>` until it shows `completed success`. Repeat with `@codex hi`
-   for the other job. Don't report the integration as done without this step
-   — a missing secret/variable fails the job, not the push.
+`scripts/provision.ts` does the whole thing: checks the repo's visibility,
+copies `templates/agents.yml` into `<repo>/.github/workflows/agents.yml`
+(committing/pushing only if it changed — safe to re-run), and — for private
+repos only, see the GitHub Free section above — sets the repo-level
+`PRISM_API_KEY`/`PRISM_ANTHROPIC_BASE_URL`/`PRISM_OPENAI_RESPONSES_ENDPOINT`
+read from this repo's local `.env`. It assumes the target repo is already
+cloned at `~/workspace/projects/<repo>` (override with `--path`).
+
+If `.env` is missing (fresh checkout, no access to this machine's copy) the
+script refuses to run rather than fabricate a key — copy `.env` over first,
+or fall back to the manual `gh secret set`/`gh variable set` commands in the
+GitHub Free section above with a key value you get from the human operator.
 
 ## Why reusable workflows instead of copy-paste
 
