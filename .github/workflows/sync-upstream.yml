@@ -1,0 +1,55 @@
+name: Sync upstream Claude template
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # weekly, Monday 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Fetch latest upstream example
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/anthropics/claude-code-action/contents/examples/claude.yml \
+            -H "Accept: application/vnd.github.raw" \
+            > vendor/anthropics-claude-code-action/examples-claude.yml.new
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if diff -q vendor/anthropics-claude-code-action/examples-claude.yml \
+                     vendor/anthropics-claude-code-action/examples-claude.yml.new > /dev/null 2>&1; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            rm vendor/anthropics-claude-code-action/examples-claude.yml.new
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            mv vendor/anthropics-claude-code-action/examples-claude.yml.new \
+               vendor/anthropics-claude-code-action/examples-claude.yml
+          fi
+
+      - name: Open PR with upstream diff
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="sync/claude-upstream-$(date +%s)"
+          git config user.name "gha-sync-bot"
+          git config user.email "actions@github.com"
+          git checkout -b "$branch"
+          git add vendor/anthropics-claude-code-action/examples-claude.yml
+          git commit -m "chore: sync vendored copy of anthropics/claude-code-action examples/claude.yml"
+          git push origin "$branch"
+          gh pr create \
+            --title "chore: upstream Claude template changed" \
+            --body "anthropics/claude-code-action updated examples/claude.yml. Review this diff against .github/workflows/claude.yml and port any relevant changes by hand (triggers, permissions, prompt conventions) — do not merge this PR as-is, it only updates the vendored reference copy." \
+            --head "$branch"

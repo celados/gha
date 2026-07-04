@@ -1,0 +1,62 @@
+name: Codex (reusable)
+
+# No upstream issue/PR-comment template exists for openai/codex-action (its
+# examples/ only has sandbox-hardening demos, and its README example triggers
+# on `pull_request: opened`, not @mentions). This file is hand-maintained —
+# see /Users/dio/workspace/.agents/backlog.md for the deferred follow-up.
+#
+# The action itself already gates on write-access by default (see
+# docs/security.md), so the `if:` below only needs to match the trigger
+# phrase, not re-check permissions.
+
+on:
+  workflow_call:
+    secrets:
+      OPENAI_API_KEY:
+        required: false
+
+jobs:
+  codex:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@codex')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@codex') || contains(github.event.issue.title, '@codex')))
+    runs-on: ubuntu-latest
+    # permissions are granted by the caller workflow (see templates/agents.yml)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Run Codex
+        id: run_codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          permission-profile: ":workspace"
+          prompt: |
+            You were mentioned in ${{ github.repository }}.
+
+            Issue title: ${{ github.event.issue.title }}
+            Issue body:
+            ${{ github.event.issue.body }}
+
+            Latest comment (if any):
+            ${{ github.event.comment.body }}
+
+            Do what was asked. If you make code changes, open a pull request
+            rather than pushing to the default branch.
+
+      - name: Post Codex result as a comment
+        if: steps.run_codex.outputs.final-message != ''
+        uses: actions/github-script@v7
+        env:
+          CODEX_FINAL_MESSAGE: ${{ steps.run_codex.outputs.final-message }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const issue_number = context.payload.issue?.number ?? context.payload.pull_request?.number
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              body: process.env.CODEX_FINAL_MESSAGE,
+            })
