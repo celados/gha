@@ -24,12 +24,28 @@ caller picks it up on its next trigger.
 - `templates/agents.yml` — the thin caller file a downstream project copies
   into its own `.github/workflows/agents.yml`. It should never need to change.
 
+## Private model routing
+
+Both workflows point at our own [prism](https://github.com/celados/prism)
+gateway (`https://ai.celados.com/api`, deployed per
+`prism/docs/deployment-ops1.md`), not the official Anthropic/OpenAI APIs.
+`celados` org-level config (already set, `--visibility all`):
+
+- `PRISM_API_KEY` (secret) — one prism account key (label `gha-celados`),
+  valid across all of prism's wires.
+- `PRISM_ANTHROPIC_BASE_URL` (variable) — `https://ai.celados.com/api/anthropic`
+- `PRISM_OPENAI_RESPONSES_ENDPOINT` (variable) —
+  `https://ai.celados.com/api/openai/responses`
+
+To mint a new/replacement key: `ssh -p 2222 root@204.168.246.193 'cd /opt/prism
+&& docker compose exec prism prism account key create --label <consumer>'`,
+then `gh secret set PRISM_API_KEY --org celados --visibility all`.
+
 ## Per-repo setup
 
 1. Copy `templates/agents.yml` to `<project>/.github/workflows/agents.yml`.
-2. Make sure the repo (or its org) has `ANTHROPIC_API_KEY` (or
-   `CLAUDE_CODE_OAUTH_TOKEN`) and `OPENAI_API_KEY` available as secrets —
-   prefer org-level secrets so new repos need zero setup.
+2. Nothing else — the org already has the secret/variables above. Repos
+   outside `celados` would need their own copies of all three.
 3. Push. Mention `@claude` or `@codex` in an issue or PR comment to trigger.
 
 ## Why reusable workflows instead of copy-paste

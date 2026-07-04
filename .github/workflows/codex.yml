@@ -3,17 +3,21 @@ name: Codex (reusable)
 # No upstream issue/PR-comment template exists for openai/codex-action (its
 # examples/ only has sandbox-hardening demos, and its README example triggers
 # on `pull_request: opened`, not @mentions). This file is hand-maintained —
-# see /Users/dio/workspace/.agents/backlog.md for the deferred follow-up.
+# see .agents/backlog.md for the deferred follow-up.
 #
 # The action itself already gates on write-access by default (see
 # docs/security.md), so the `if:` below only needs to match the trigger
 # phrase, not re-check permissions.
+#
+# Routed through our private prism gateway — same PRISM_API_KEY as claude.yml,
+# pointed at prism's openai-responses wire. That wire currently only serves
+# GLM (see celados/prism's config.jsonc routes), hence the pinned `model`.
 
 on:
   workflow_call:
     secrets:
-      OPENAI_API_KEY:
-        required: false
+      PRISM_API_KEY:
+        required: true
 
 jobs:
   codex:
@@ -30,7 +34,9 @@ jobs:
         id: run_codex
         uses: openai/codex-action@v1
         with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          openai-api-key: ${{ secrets.PRISM_API_KEY }}
+          responses-api-endpoint: ${{ vars.PRISM_OPENAI_RESPONSES_ENDPOINT }}
+          model: glm
           permission-profile: ":workspace"
           prompt: |
             You were mentioned in ${{ github.repository }}.
