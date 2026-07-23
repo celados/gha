@@ -117,10 +117,12 @@ each caller prepare the evidence its agent actually needs.
 
 The Codex runner can write only inside the workspace, cannot read `.env` files,
 has no sudo, and can reach only GitHub download/API domains. It never receives
-the token used to mutate GitHub. Codex returns a structured unified patch and
-ends; a clean runner validates protected paths, applies the patch, pushes a
-deduplicated branch, and opens a PR. Workflow and local-action changes are
-rejected unless the caller explicitly sets `allow_workflow_changes`.
+the token used to mutate GitHub. Its actual workspace diff and final message are
+uploaded as an artifact; a clean runner validates protected paths, applies the
+patch, pushes a deduplicated branch, and opens a PR. This deliberately does not
+trust the model to serialize the patch into its final response. Workflow and
+local-action changes are rejected unless the caller explicitly sets
+`allow_workflow_changes`.
 
 GitHub disables PR creation by `GITHUB_TOKEN` by default. When that repository
 setting remains off, the branch is still pushed and the tracking issue receives
