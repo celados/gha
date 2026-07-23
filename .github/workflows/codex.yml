@@ -56,6 +56,9 @@ jobs:
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@codex')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@codex') || contains(github.event.issue.title, '@codex')))
     runs-on: ${{ inputs.runner }}
+    # Agent tasks must fail closed instead of occupying a runner indefinitely
+    # when a model gateway stalls.
+    timeout-minutes: 20
     permissions:
       contents: read
       actions: read
