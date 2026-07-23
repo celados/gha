@@ -14,16 +14,15 @@ on:
   issues:
     types: [opened, assigned]
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  id-token: write
-  actions: read
-
 jobs:
   claude:
     uses: celados/gha/.github/workflows/claude.yml@main
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
     # `secrets: inherit` unreliably resolves org secrets across a
     # cross-repo reusable-workflow call with a `required: true` secret
     # (documented GitHub Actions flakiness) — pass explicitly instead.
@@ -32,5 +31,10 @@ jobs:
 
   codex:
     uses: celados/gha/.github/workflows/codex.yml@main
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: read
     secrets:
       PRISM_API_KEY: ${{ secrets.PRISM_API_KEY }}

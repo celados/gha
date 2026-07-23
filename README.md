@@ -11,9 +11,10 @@ caller picks it up on its next trigger.
   [`anthropics/claude-code-action`](https://github.com/anthropics/claude-code-action).
   Derived from that repo's `examples/claude.yml`.
 - `.github/workflows/codex.yml` — reusable workflow wrapping
-  [`openai/codex-action`](https://github.com/openai/codex-action). Hand-authored:
-  no upstream issue/comment-triggered template exists to derive from (see
-  `.github/workflows/codex.yml`'s header comment).
+  [`openai/codex-action`](https://github.com/openai/codex-action). Handles both
+  issue/comment mentions and explicit CI repair tasks, then validates the
+  generated patch on a clean runner before opening a pull request. Hand-authored:
+  no upstream issue/comment-triggered template exists to derive from.
 - `.github/workflows/sync-upstream.yml` — weekly bot that re-fetches
   `anthropics/claude-code-action`'s `examples/claude.yml` and opens a PR here
   when it changes upstream, so `claude.yml` can be manually reconciled instead
@@ -97,6 +98,35 @@ If `.env` is missing (fresh checkout, no access to this machine's copy) the
 script refuses to run rather than fabricate a key — copy `.env` over first,
 or fall back to the manual `gh secret set`/`gh variable set` commands in the
 GitHub Free section above with a key value you get from the human operator.
+
+## Automated Codex tasks
+
+`codex.yml` is also the shared runtime for trusted workflows that want to start
+Codex without manufacturing an `@codex` event. Its small interface is:
+
+- `task` — the work contract.
+- `task_key` — a stable deduplication key and repair-branch identity.
+- `context_artifact` — an optional caller-produced artifact unpacked into
+  `.agent-context`.
+- `tracking_issue` — an optional issue that receives the result and PR link.
+
+Domain facts do not become workflow inputs. For example, an upstream SHA or a
+failed build phase belongs in `.agent-context/task.json`; logs and other compact
+evidence live beside it. This keeps the reusable interface stable while letting
+each caller prepare the evidence its agent actually needs.
+
+The Codex runner can write only inside the workspace, cannot read `.env` files,
+has no sudo, and can reach only GitHub download/API domains. It never receives
+the token used to mutate GitHub. Codex returns a structured unified patch and
+ends; a clean runner validates protected paths, applies the patch, pushes a
+deduplicated branch, and opens a PR. Workflow and local-action changes are
+rejected unless the caller explicitly sets `allow_workflow_changes`.
+
+GitHub disables PR creation by `GITHUB_TOKEN` by default. When that repository
+setting remains off, the branch is still pushed and the tracking issue receives
+a compare link that a maintainer can use to open the PR. Enable **Allow GitHub
+Actions to create and approve pull requests** only for repositories where fully
+automatic PR creation is intended.
 
 ## Why reusable workflows instead of copy-paste
 
