@@ -1,0 +1,6 @@
+self-hosted-runner:
+  # celados ARC scale sets (celados/berth docs/github-actions-runner-pool.md)
+  labels:
+    - celados-linux
+    - celados-linux-light
+    - celados-linux-large

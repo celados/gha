@@ -10,8 +10,21 @@ name: Claude Code (reusable)
 # docs/deployment-ops1.md runbook. PRISM_API_KEY / PRISM_ANTHROPIC_BASE_URL
 # are org-level secret/variable on celados.
 
+# Runner rule (private callers: celados self-hosted; public: GitHub-hosted).
+# These jobs act on issue/comment text that anyone can write in a public repo,
+# with no author gating, and our ARC pods run a privileged DinD sidecar — so a
+# public repository's event never reaches them. `visibility` is compared as a
+# string because an absent payload field (schedule events) is null, and
+# GitHub's loose `null == false` is true. An explicit `runner` input wins.
+
 on:
   workflow_call:
+    inputs:
+      runner:
+        description: Runner label; empty picks celados-linux for private repos, ubuntu-latest for public ones
+        required: false
+        default: ""
+        type: string
     secrets:
       PRISM_API_KEY:
         required: true
@@ -23,7 +36,9 @@ jobs:
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner != '' && inputs.runner || (github.event.repository.visibility == 'public' && 'ubuntu-latest' || 'celados-linux') }}
+    # A stalled model gateway must not hold a runner for six hours.
+    timeout-minutes: 30
     # permissions are granted by the caller workflow (see templates/agents.yml)
     env:
       ANTHROPIC_BASE_URL: ${{ vars.PRISM_ANTHROPIC_BASE_URL }}

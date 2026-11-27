@@ -7,6 +7,13 @@ name: Codex (reusable)
 # Codex never receives a repository mutation token. Its workspace diff is
 # captured as an artifact, then a clean runner validates and publishes it so
 # model output formatting cannot corrupt the handoff contract.
+#
+# Runner rule (private callers: celados self-hosted; public: GitHub-hosted).
+# These jobs act on issue/comment text that anyone can write in a public repo,
+# with no author gating, and our ARC pods run a privileged DinD sidecar — so a
+# public repository's event never reaches them. `visibility` is compared as a
+# string because an absent payload field (schedule events) is null, and
+# GitHub's loose `null == false` is true. An explicit `runner` input wins.
 
 on:
   workflow_call:
@@ -32,9 +39,9 @@ on:
         default: ""
         type: string
       runner:
-        description: Runner label for the Codex job
+        description: Runner label for the Codex job; empty picks celados-linux for private repos, ubuntu-latest for public ones
         required: false
-        default: ubuntu-latest
+        default: ""
         type: string
       allow_workflow_changes:
         description: Permit generated patches to change workflow/action files
@@ -55,7 +62,7 @@ jobs:
       inputs.task != '' ||
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@codex')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@codex') || contains(github.event.issue.title, '@codex')))
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ inputs.runner != '' && inputs.runner || (github.event.repository.visibility == 'public' && 'ubuntu-latest' || 'celados-linux') }}
     # Agent tasks must fail closed instead of occupying a runner indefinitely
     # when a model gateway stalls.
     timeout-minutes: 20
@@ -164,7 +171,10 @@ jobs:
   publish:
     needs: codex
     if: ${{ always() && needs.codex.result == 'success' }}
-    runs-on: ubuntu-latest
+    # Only git and GitHub API calls: the light pool. It holds a write token,
+    # so it follows the codex job's visibility rule rather than its input.
+    runs-on: ${{ github.event.repository.visibility == 'public' && 'ubuntu-latest' || 'celados-linux-light' }}
+    timeout-minutes: 10
     permissions:
       actions: read
       contents: write
