@@ -27,6 +27,14 @@ caller picks it up on its next trigger.
 - `scripts/provision.ts` — onboards a new project (see below). Reads secrets
   from local `.env` (gitignored, not in this listing on purpose).
 
+## Runners
+
+`claude.yml` and `codex.yml` take an optional `runner` input. Left empty, a
+private caller runs on the `celados-linux` ARC pool (codex's `publish` job on
+`celados-linux-light`), and a public caller stays on `ubuntu-latest`: anyone
+can write the issue or comment that triggers these jobs in a public repository,
+and the ARC pods are for trusted code only. Callers need no `runner` line.
+
 ## Private model routing
 
 Both workflows point at our own [prism](https://github.com/celados/prism)
